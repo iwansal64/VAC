@@ -1,15 +1,17 @@
-import os, subprocess, sys, json, time, ollama, threading, datetime
+import os, subprocess, sys, json, time, ollama, threading, datetime, io
 from typing import Tuple, Mapping, Iterator
 
+#? Colors that we'll use later!
 RED_COLOR = "\033[0;31m"
 GREEN_COLOR = "\033[0;32m"
 WHITE_COLOR = "\033[0;37m"
 GREEN_BOLD_COLOR = "\033[1;32m"
 BLUE_BOLD_COLOR = "\033[1;34m"
 YELLOW_BOLD_COLOR = "\033[1;33m"
-USER_COLOR = GREEN_BOLD_COLOR
-ARCH_COLOR = BLUE_BOLD_COLOR
-AFK_COLOR = YELLOW_BOLD_COLOR
+
+USER_TEXT_COLOR = GREEN_BOLD_COLOR
+ARCH_TEXT_COLOR = BLUE_BOLD_COLOR
+AFK_TEXT_COLOR = YELLOW_BOLD_COLOR
 
 #? Used to synchronize the AI side to the USER side
 running = True
@@ -20,10 +22,18 @@ current_context = []
 #? Used to make the AI talk to the user wherever the wait time is up
 wait_time = -1
 
+#? Used to keep tracking of how many times the user afk
+afk_count = 0
+
+
 #? Configration file path... You can change it if you want to make it permanently change :)
 configuration_file_path = f"/home/{os.getlogin()}/.config/vac/config.json"
+
 #? Message file path
-message_file_path = f"/home/{os.getlogin()}/.config/vac/virtual-arch-message.txt"
+message_folder_path = ""
+
+#? Save messages history
+save_messages_history = False
 
 def print_error(title: str, message: str) -> None:
     '''
@@ -44,7 +54,17 @@ def cmd(command: str) -> Tuple[bytes, int]:
     res = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     return (str(res.stdout.read())[2:-3].replace("\\n", "\n"), res.wait())
 
-def open_user_side():
+cmd_threads: list[threading.Thread] = []
+
+def open_cmd(command: str) -> None:
+    '''
+    Open CMD to run commands by the AI
+    '''
+    global cmd_threads
+    cmd(f"kitty sh ./open_cmd.sh '{command}' & disown")
+    del cmd_threads[-1]
+
+def open_user_side() -> None:
     '''
     Open the client side in new window
     '''
@@ -89,38 +109,75 @@ def generate_response(response_iterator: Iterator[Mapping[str, str]], update_con
     '''
     global wait_time
     global current_context
-    next_wait_time = ""
+    global afk_count
+    
+    next_value = ""
+
     for response_item in response_iterator:
         response = response_item.get("response")
-        if "[" in response or next_wait_time != "":
-            next_wait_time += response
-            
-            if next_wait_time.startswith("[wt:") and "]" in next_wait_time:
-                debug(f"BEFORE:{next_wait_time}")
-                next_wait_time = next_wait_time.replace(" ", "") #? Removes spaces
-                next_wait_time = next_wait_time.replace("wt", "") #? Removes 'wt'
-                next_wait_time = next_wait_time.replace(":", "") #? Removes ':'
-                next_wait_time = next_wait_time.replace("[", "") #? Removes open parentheses
-                next_wait_time = next_wait_time.replace("]", "") #? Removes close parentheses
-                debug(f"AFTER:{next_wait_time}")
 
-                if next_wait_time == "N/A":
+        if "[" in response or next_value != "":
+            debug(response)
+            next_value += response
+            
+            end_of_system_command = "]" in next_value
+            if end_of_system_command:
+                debug(next_value)
+                debug("END OF SYSTEM COMMAND")
+
+            #? Maximum amount of auto chat is 2
+            if afk_count + 1 < 2 and next_value.replace(" ", "").startswith("[wt:") and end_of_system_command:
+                next_value = next_value.replace(" ", "") #? Removes spaces
+                next_value = next_value.replace("wt", "") #? Removes 'wt'
+                next_value = next_value.replace(":", "") #? Removes ':'
+                next_value = next_value.replace("[", "") #? Removes open parentheses
+                next_value = next_value.replace("]", "") #? Removes close parentheses
+
+                if next_value == "N/A":
                     wait_time = -1
                 else:
                     try:
-                        wait_time = int(next_wait_time)
-                        debug(f"wait_time ({next_wait_time}) is a number")
+                        wait_time = int(next_value) + 10
+                        debug(f"wait_time ({next_value}) is a number")
                     except ValueError:
-                        debug(f"wait_time ({next_wait_time}) is not a number")
+                        debug(f"wait_time ({next_value}) is not a number")
 
-                next_wait_time = ""
 
-        print(response, end="", flush=True)
+            if next_value.replace(" ", "").startswith("[cmd:") and end_of_system_command:
+                next_value = next_value.replace("cmd", "") #? Removes 'wt'
+                next_value = next_value.replace(":", "") #? Removes ':'
+                next_value = next_value.replace("[", "") #? Removes open parentheses
+                next_value = next_value.replace("]", "") #? Removes close parentheses
+
+                debug(f"COMMAND : {next_value}")
+                cmd_threads.append(threading.Thread(target=open_cmd, args=[next_value]))
+                cmd_threads[-1].start()
+
+            if end_of_system_command:
+                next_value = ""
+
+
+        else:
+            print(response, end="", flush=True)
         
         if update_context and response_item["done"] == True: #?OPTIMIZATION REQUIRED
             current_context = response_item["context"]
 
-
+def get_option(options: list[str], short_option: str, long_option: str) -> str:
+    index = 0
+    try:
+        index = options.index(long_option)
+    except ValueError:
+        index = options.index(short_option)
+        
+    try:
+        #? Update the configuration file
+        index = options.index(short_option)
+        return options[index+1]
+    except IndexError:
+        #? If the option is not complete
+        print(f"please specify the configuration file or not using {short_option} or {long_option} at all :)")
+        exit(0)
 
 
 #? Check if there's ollama inside the machine
@@ -144,46 +201,27 @@ choosen_model = ""
 if len(options) > 0:
     #? If the user specify the model
     if "--model" in options or "-m" in options:
-        index = 0
-        try:
-            index = options.index("--model") 
-        except ValueError:
-            index = options.index("-m")
-            
-        try:
-            #? Update the choosen model
-            choosen_model = options[index+1]
-        except IndexError:
-            #? If the option is not complete!
-            print("please specify the model or not using -m or --model at all :)")
+        choosen_model = get_option(options, "-m", "--model")
 
     #? Listing ollama model
-    elif "--list-model" in options or "-l" in options:
+    if "--list-model" in options or "-l" in options:
         [output, code] = cmd("ollama list")
         print(f"{output}")
         exit(0)
 
     #? Specify configuration file path
-    elif "--config" in options or "-c" in options:
-        index = 0
-        try:
-            index = options.index("--config") 
-        except ValueError:
-            index = options.index("-c")
-            
-        try:
-            #? Update the configuration file
-            index = options.index("-c")
-            configuration_file_path = options[index+1]
-        except IndexError:
-            #? If the option is not complete
-            print("please specify the configuration file or not using -c or --config at all :)")
+    if "--config" in options or "-c" in options:
+        configuration_file_path = get_option(options, "--config", "-c")
 
     #? Fast startup mode
-    elif "--fast" in options or "-f" in options:
+    if "--fast" in options or "-f" in options:
         fast_startup = True
 
+    if "--message-folder" in options or "-f" in options:
+        message_folder_path = get_option(options, "-f", "--message-folder")
+        
 
+# ----------------------------------------------- USER CONFIGURATION ----------------------------------------------- #
 #? If the choosen model is empty.. Get the model from the configuration file
 user_configurations = {}
 try:
@@ -203,8 +241,18 @@ if choosen_model == "":
     else:
         choosen_model = user_configurations["model"]
 
-if "message-file-path" in user_configurations:
-    message_file_path = user_configurations.get("message-file-path")
+if message_folder_path == "" and "message-folder-path" in user_configurations and user_configurations.get("message-folder-path") != "":
+    message_folder_path = user_configurations.get("message-folder-path")
+
+if message_folder_path == "":
+    message_folder_path = f"/home/{os.getlogin()}/.var/vac/messages"
+
+if "save-message-history" in user_configurations and user_configurations.get("save-message-history") != "":
+    save_messages_history = user_configurations.get("save-message-history")
+
+# ---------------------------------------------------------------------------------------------------------------- #
+
+message_folder_path = message_folder_path if message_folder_path.endswith("/") else (message_folder_path+"/")
 
 #? ====== Starting ollama service ===== ?#
 [output, code] = cmd("ollama start")
@@ -243,26 +291,39 @@ elif "first-prompt" in user_configurations and user_configurations["first-prompt
 #? ====== Load the profile if there's load-profile in the config file ====== ?#
 print("Waiting for command..")
 while running:
-    message_file = open(message_file_path, "r+")
-    message = message_file.read()
-    message_file.close()
+    message = ""
+    print(f"{RED_COLOR}[CHECKING..]") #? DEBUGGIN3
+    for file in os.listdir(message_folder_path):
+        if file.endswith(".vac") and file.startswith("message-"):
+            file_path = message_folder_path + file
+            message_file:io.TextIOWrapper = io.open(file_path, "r+")
+            message = message_file.read()
+            message_file.close()
+            if save_messages_history:
+                debug(f"mv '{message_file.name} {message_file.name[:-len(file)]}/history-{file}'")
+                cmd(f"mv '{message_file.name} {message_file.name[:-len(file)]}/history-{file}'")
+            else:
+                debug(f"rm '{message_file.name}'")
+                cmd(f"rm '{message_file.name}'")
+            
+    
 
     #? If there's a new message
     if message != "":
-        print(f"{USER_COLOR}[USER] {WHITE_COLOR}{message}")
+        print(f"{USER_TEXT_COLOR}[USER] {WHITE_COLOR}{message}")
         result = send_req_to_ai(message, choosen_model)
-        print(f"{ARCH_COLOR}[ARCH] {WHITE_COLOR}", end="")
+        print(f"{ARCH_TEXT_COLOR}[ARCH] {WHITE_COLOR}", end="")
         generate_response(result)
         print()
-        
-        with open(message_file_path, "w") as f:
-            f.write("")
+        afk_count = 0
 
     if wait_time < 1 and wait_time > -1:
+        print(f"{AFK_TEXT_COLOR}[WAIT TIMEOUT] {WHITE_COLOR}", end="\n", flush=True)
         result = send_req_to_ai(f"[system:system_command] you've waited for the user but the user is not answered you or maybe he's currently afk or maybe he's currently typing..", choosen_model)
-        print(f"{ARCH_COLOR}[ARCH] {WHITE_COLOR}", end="")
+        print(f"{ARCH_TEXT_COLOR}[ARCH] {WHITE_COLOR}", end="", flush=True)
         generate_response(result)
         print()
+        afk_count += 1
         
     wait_time -= 1
     time.sleep(1) #? In order to make it doesn't read too fast.
