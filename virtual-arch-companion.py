@@ -1,6 +1,9 @@
 import os, subprocess, sys, json, time, ollama, threading, datetime, io
 from typing import Tuple, Mapping, Iterator
 
+HOME = f"/home/{os.getlogin()}"
+VERSION = "0.8"
+
 #? Colors that we'll use later!
 RED_COLOR = "\033[0;31m"
 GREEN_COLOR = "\033[0;32m"
@@ -27,7 +30,7 @@ afk_count = 0
 
 
 #? Configration file path... You can change it if you want to make it permanently change :)
-configuration_file_path = f"/home/{os.getlogin()}/.config/vac/config.json"
+configuration_file_path = f"{HOME}/.config/vac/config.json"
 
 #? Message file path
 message_folder_path = ""
@@ -75,7 +78,6 @@ def open_user_side() -> None:
 
 
 client_thread = threading.Thread(target=open_user_side)
-client_thread.start()
 
 def debug(message:str):
     '''
@@ -211,14 +213,20 @@ if len(options) > 0:
 
     #? Specify configuration file path
     if "--config" in options or "-c" in options:
-        configuration_file_path = get_option(options, "--config", "-c")
+        configuration_file_path = get_option(options, "--config", "-c").replace("~", HOME)
 
     #? Fast startup mode
     if "--fast" in options or "-f" in options:
         fast_startup = True
 
+    #? Change message folder
     if "--message-folder" in options or "-f" in options:
-        message_folder_path = get_option(options, "-f", "--message-folder")
+        message_folder_path = get_option(options, "-f", "--message-folder").replace("~", HOME)
+
+    #? 
+    if "--version" in options or "-v" in options:
+        print(f"VAC (Virtual Arch Companion). ver: {VERSION}")
+        exit(0)
         
 
 # ----------------------------------------------- USER CONFIGURATION ----------------------------------------------- #
@@ -288,7 +296,8 @@ elif "first-prompt" in user_configurations and user_configurations["first-prompt
     
 
 
-#? ====== Load the profile if there's load-profile in the config file ====== ?#
+#? ====== Running the AI! ====== ?#
+client_thread.start()
 print("Waiting for command..")
 while running:
     message = ""

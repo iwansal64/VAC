@@ -1,1 +1,1 @@
-source /home/ridwan/Codes/Python/VAC/.venv/bin/activate &&  cd /home/ridwan/Codes/Python/VAC && .venv/bin/python /home/ridwan/Codes/Python/VAC/virtual-arch-companion.py
+source /home/ridwan/Codes/Python/VAC/.venv/bin/activate &&  cd /home/ridwan/Codes/Python/VAC && .venv/bin/python /home/ridwan/Codes/Python/VAC/virtual-arch-companion.py $1 $2 $3 $4 $5 $6
