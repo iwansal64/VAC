@@ -139,7 +139,7 @@ def generate_response(response_iterator: Iterator[Mapping[str, str]], update_con
                     wait_time = -1
                 else:
                     try:
-                        wait_time = int(next_value) + 10
+                        wait_time = int(next_value) * 2
                         debug(f"wait_time ({next_value}) is a number")
                     except ValueError:
                         debug(f"wait_time ({next_value}) is not a number")
@@ -231,10 +231,14 @@ if len(options) > 0:
 
 # ----------------------------------------------- USER CONFIGURATION ----------------------------------------------- #
 #? If the choosen model is empty.. Get the model from the configuration file
+configuration_file_path = configuration_file_path.replace("~", HOME)
 user_configurations = {}
 try:
     with open(configuration_file_path, "r") as f:
         user_configurations = json.load(f)
+        for configuration in user_configurations:
+            if "path" in configuration:
+                user_configurations[configuration] = user_configurations[configuration].replace("~", HOME)
 except FileNotFoundError:
     pass
 
@@ -261,6 +265,7 @@ if "save-message-history" in user_configurations and user_configurations.get("sa
 # ---------------------------------------------------------------------------------------------------------------- #
 
 message_folder_path = message_folder_path if message_folder_path.endswith("/") else (message_folder_path+"/")
+message_folder_path = message_folder_path.replace("~", HOME)
 
 #? ====== Starting ollama service ===== ?#
 [output, code] = cmd("ollama start")
@@ -301,7 +306,7 @@ client_thread.start()
 print("Waiting for command..")
 while running:
     message = ""
-    print(f"{RED_COLOR}[CHECKING..]") #? DEBUGGIN3
+    # print(f"{RED_COLOR}[CHECKING..]") #? DEBUGGING
     for file in os.listdir(message_folder_path):
         if file.endswith(".vac") and file.startswith("message-"):
             file_path = message_folder_path + file
@@ -333,6 +338,7 @@ while running:
         generate_response(result)
         print()
         afk_count += 1
+        wait_time -= 3
         
     wait_time -= 1
     time.sleep(1) #? In order to make it doesn't read too fast.
