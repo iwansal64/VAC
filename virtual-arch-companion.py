@@ -174,15 +174,15 @@ def generate_response(response_iterator: Iterator[Mapping[str, str]], update_con
                     wait_time = -1
                 else:
                     try:
-                        wait_time = int(next_value) * 2
+                        wait_time = min(10, int(next_value)) * 2 #? Constrain the wait time to the minimal value of 10 seconds * 2 which is 20 seconds
                         debug(f"wait_time ({next_value}) is a number")
                     except ValueError:
                         debug(f"wait_time ({next_value}) is not a number")
 
             if allow_command_prompt:
                 if next_value.replace(" ", "").startswith("[cmd:") and end_of_system_command:
-                    next_value = next_value[next_value.index("["):]
-                    next_value = next_value.replace("cmd", "") #? Removes 'wt'
+                    next_value = next_value[next_value.index("["):next_value.index("]")]
+                    next_value = next_value.replace("cmd", "") #? Removes 'cmd'
                     next_value = next_value.replace(":", "") #? Removes ':'
                     next_value = next_value.replace("[", "") #? Removes open parentheses
                     next_value = next_value.replace("]", "") #? Removes close parentheses
@@ -317,6 +317,9 @@ if check_configuration("confirmation-command-prompt"):
 
 if check_configuration("activate-memory"):
     activate_memory = user_configurations.get("activate-memory")
+
+if check_configuration("memory-file-path"):
+    memory_file_path = user_configurations.get("memory-file-path")
 
 
 # ---------------------------------------------------------------------------------------------------------------- #
