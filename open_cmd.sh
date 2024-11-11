@@ -1,1 +1,1 @@
-zsh -c "python3 run-command.py '$1'"
+zsh -c "python3 run-command.py '$1' '$2'"

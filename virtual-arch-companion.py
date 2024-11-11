@@ -1,5 +1,8 @@
-import os, subprocess, sys, json, time, ollama, threading, datetime, io
+# !pip install playsound
+import os, subprocess, sys, json, time, ollama, threading, datetime, io, playsound
 from typing import Tuple, Mapping, Iterator
+
+CURRENT_DIR = "/".join(__file__.split("/")[:-1])
 
 HOME = f"/home/{os.getlogin()}"
 VERSION = "0.8"
@@ -28,7 +31,6 @@ wait_time = -1
 #? Used to keep tracking of how many times the user afk
 afk_count = 0
 
-
 #? Configration file path... You can change it if you want to make it permanently change :)
 configuration_file_path = f"{HOME}/.config/vac/config.json"
 
@@ -37,6 +39,15 @@ message_folder_path = ""
 
 #? Save messages history
 save_messages_history = False
+
+#? Allow command prompt
+allow_command_prompt = True
+
+#? Confirmation command prompt
+confirmation_command_prompt = True
+
+#? Sound folder path
+sounds_folder_path = ""
 
 def print_error(title: str, message: str) -> None:
     '''
@@ -64,7 +75,8 @@ def open_cmd(command: str) -> None:
     Open CMD to run commands by the AI
     '''
     global cmd_threads
-    cmd(f"kitty sh ./open_cmd.sh '{command}' & disown")
+    global confirmation_command_prompt
+    cmd(f"kitty sh ./open_cmd.sh '{command}' '{confirmation_command_prompt}' & disown")
     del cmd_threads[-1]
 
 def open_user_side() -> None:
@@ -85,7 +97,7 @@ def debug(message:str):
     '''
     if "debug-file-path" in user_configurations and user_configurations.get("debug-file-path") != "":
         with open(user_configurations.get("debug-file-path"), "a+") as f:
-            f.write(f"[{datetime.datetime.now().strftime(r"%d/%m/%Y %H:%M:%S")}]{message}\n")
+            f.write(f"[{datetime.datetime.now().strftime(r'%d/%m/%Y %H:%M:%S')}]{message}\n")
 
 def send_req_to_ai(command: str, model: str) -> Iterator[Mapping[str, str]]:
     '''
@@ -114,9 +126,13 @@ def generate_response(response_iterator: Iterator[Mapping[str, str]], update_con
     global afk_count
     
     next_value = ""
-
+    is_processing = False
+    
     for response_item in response_iterator:
         response = response_item.get("response")
+        if not is_processing:
+            playsound.playsound(sounds_folder_path+"/reply-notification.wav")
+            is_processing = True
 
         if "[" in response or next_value != "":
             debug(response)
@@ -129,6 +145,7 @@ def generate_response(response_iterator: Iterator[Mapping[str, str]], update_con
 
             #? Maximum amount of auto chat is 2
             if afk_count + 1 < 2 and next_value.replace(" ", "").startswith("[wt:") and end_of_system_command:
+                next_value = next_value[next_value.index("["):]
                 next_value = next_value.replace(" ", "") #? Removes spaces
                 next_value = next_value.replace("wt", "") #? Removes 'wt'
                 next_value = next_value.replace(":", "") #? Removes ':'
@@ -144,16 +161,17 @@ def generate_response(response_iterator: Iterator[Mapping[str, str]], update_con
                     except ValueError:
                         debug(f"wait_time ({next_value}) is not a number")
 
+            if allow_command_prompt:
+                if next_value.replace(" ", "").startswith("[cmd:") and end_of_system_command:
+                    next_value = next_value[next_value.index("["):]
+                    next_value = next_value.replace("cmd", "") #? Removes 'wt'
+                    next_value = next_value.replace(":", "") #? Removes ':'
+                    next_value = next_value.replace("[", "") #? Removes open parentheses
+                    next_value = next_value.replace("]", "") #? Removes close parentheses
 
-            if next_value.replace(" ", "").startswith("[cmd:") and end_of_system_command:
-                next_value = next_value.replace("cmd", "") #? Removes 'wt'
-                next_value = next_value.replace(":", "") #? Removes ':'
-                next_value = next_value.replace("[", "") #? Removes open parentheses
-                next_value = next_value.replace("]", "") #? Removes close parentheses
-
-                debug(f"COMMAND : {next_value}")
-                cmd_threads.append(threading.Thread(target=open_cmd, args=[next_value]))
-                cmd_threads[-1].start()
+                    debug(f"COMMAND : {next_value}")
+                    cmd_threads.append(threading.Thread(target=open_cmd, args=[next_value]))
+                    cmd_threads[-1].start()
 
             if end_of_system_command:
                 next_value = ""
@@ -173,7 +191,6 @@ def get_option(options: list[str], short_option: str, long_option: str) -> str:
         index = options.index(short_option)
         
     try:
-        #? Update the configuration file
         index = options.index(short_option)
         return options[index+1]
     except IndexError:
@@ -239,8 +256,14 @@ try:
         for configuration in user_configurations:
             if "path" in configuration:
                 user_configurations[configuration] = user_configurations[configuration].replace("~", HOME)
+                
+                if "$FILE_PATH" in user_configurations[configuration]:
+                    user_configurations[configuration] = user_configurations[configuration].replace("$FILE_PATH", CURRENT_DIR)
+                
 except FileNotFoundError:
     pass
+
+check_configuration = lambda configuration: configuration in user_configurations and user_configurations.get(configuration) != ""
 
 #? If model has not been specified by the user
 if choosen_model == "":
@@ -253,14 +276,24 @@ if choosen_model == "":
     else:
         choosen_model = user_configurations["model"]
 
-if message_folder_path == "" and "message-folder-path" in user_configurations and user_configurations.get("message-folder-path") != "":
+if check_configuration("message-folder-path"):
     message_folder_path = user_configurations.get("message-folder-path")
 
 if message_folder_path == "":
     message_folder_path = f"/home/{os.getlogin()}/.var/vac/messages"
 
-if "save-message-history" in user_configurations and user_configurations.get("save-message-history") != "":
+if check_configuration("save-message-history"):
     save_messages_history = user_configurations.get("save-message-history")
+
+if check_configuration("sounds-folder-path"):
+    sounds_folder_path = user_configurations.get("sounds-folder-path")
+
+if check_configuration("allow-command-prompt"):
+    allow_command_prompt = user_configurations.get("allow-command-prompt")
+
+if check_configuration("confirmation-command-prompt"):
+    confirmation_command_prompt = user_configurations.get("confirmation-command-prompt")
+
 
 # ---------------------------------------------------------------------------------------------------------------- #
 

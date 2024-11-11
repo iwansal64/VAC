@@ -15,7 +15,7 @@ while True:
     print("\033[0;32mMessage VAC:\033[0;37m")
     message = input()
     
-    with open(message_folder_path + f"/message-{datetime.datetime.now().strftime(r"%d-%m-%Y %H-%M-%S")}.vac", "w") as message_file:
+    with open(message_folder_path + f"/message-{datetime.datetime.now().strftime(r'%d-%m-%Y %H-%M-%S')}.vac", "w") as message_file:
         message_file.write(message)
         
     if message == "/bye":
