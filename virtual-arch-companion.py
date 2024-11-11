@@ -35,7 +35,13 @@ afk_count = 0
 configuration_file_path = f"{HOME}/.config/vac/config.json"
 
 #? Message file path
-message_folder_path = ""
+message_folder_path = "{HOME}/.var/vac/messages"
+
+#? Memory file path
+memory_file_path = f"{CURRENT_DIR}/memory.json"
+
+#? Sound folder path
+sounds_folder_path = "{CURRENT_DIR}/Sounds"
 
 #? Save messages history
 save_messages_history = False
@@ -46,8 +52,8 @@ allow_command_prompt = True
 #? Confirmation command prompt
 confirmation_command_prompt = True
 
-#? Sound folder path
-sounds_folder_path = ""
+#? Activate memory
+activate_memory = True
 
 def print_error(title: str, message: str) -> None:
     '''
@@ -81,7 +87,7 @@ def open_cmd(command: str) -> None:
 
 def open_user_side() -> None:
     '''
-    Open the client side in new window
+    Open the user side in new window
     '''
     global running
 
@@ -91,9 +97,21 @@ def open_user_side() -> None:
 
 client_thread = threading.Thread(target=open_user_side)
 
+def update_memory():
+    '''
+    Function that used to update the memory of AI
+    '''
+    global current_context
+    
+    with open(memory_file_path, "w") as memory_file:
+        json.dump({
+            "context": current_context,
+            "time": time.time()
+        }, memory_file)
+
 def debug(message:str):
     '''
-    Function that used to log a debug
+    Function that used to log a debug to the debug file path
     '''
     if "debug-file-path" in user_configurations and user_configurations.get("debug-file-path") != "":
         with open(user_configurations.get("debug-file-path"), "a+") as f:
@@ -101,7 +119,7 @@ def debug(message:str):
 
 def send_req_to_ai(command: str, model: str) -> Iterator[Mapping[str, str]]:
     '''
-    Function that used to send prompt to the AI
+    Function that used to send prompt to the AI and get the result
     '''
     global current_context
     try:
@@ -119,7 +137,7 @@ def send_req_to_ai(command: str, model: str) -> Iterator[Mapping[str, str]]:
 
 def generate_response(response_iterator: Iterator[Mapping[str, str]], update_context=True):
     '''
-    Used to generating response
+    Used to generating response. response_iterator is should be the result of `ollama.generate(stream=True)` function
     '''
     global wait_time
     global current_context
@@ -184,6 +202,9 @@ def generate_response(response_iterator: Iterator[Mapping[str, str]], update_con
             current_context = response_item["context"]
 
 def get_option(options: list[str], short_option: str, long_option: str) -> str:
+    '''
+    Get the value of the option that given by the user
+    '''
     index = 0
     try:
         index = options.index(long_option)
@@ -194,7 +215,7 @@ def get_option(options: list[str], short_option: str, long_option: str) -> str:
         index = options.index(short_option)
         return options[index+1]
     except IndexError:
-        #? If the option is not complete
+        #? If the option doesn't include the value
         print(f"please specify the configuration file or not using {short_option} or {long_option} at all :)")
         exit(0)
 
@@ -294,7 +315,47 @@ if check_configuration("allow-command-prompt"):
 if check_configuration("confirmation-command-prompt"):
     confirmation_command_prompt = user_configurations.get("confirmation-command-prompt")
 
+if check_configuration("activate-memory"):
+    activate_memory = user_configurations.get("activate-memory")
 
+
+# ---------------------------------------------------------------------------------------------------------------- #
+
+# ---------------------------------------------- RETRIEVE MEMORY --------------------------------------------------#
+
+last_time = 0
+if activate_memory:
+    try:
+        with open(memory_file_path, "r") as f:
+            saved_memory = json.load(f)
+            try:
+                last_time = saved_memory["time"]
+                current_context = saved_memory["context"]
+            except KeyError:
+                pass
+
+    except FileNotFoundError:
+        pass
+
+    
+#? Retrieve time memory
+seconds = round(time.time() - last_time)
+minutes = 0
+hours = 0
+days = 0
+
+while seconds >= 60:
+    seconds -= 60
+    minutes += 1
+
+while minutes >= 60:
+    minutes -= 60
+    hours += 1
+
+while hours >= 24:
+    hours -= 24
+    days += 1
+    
 # ---------------------------------------------------------------------------------------------------------------- #
 
 message_folder_path = message_folder_path if message_folder_path.endswith("/") else (message_folder_path+"/")
@@ -317,17 +378,24 @@ if output != 0:
 
 print_success("STARTING OLLAMA SUCCESS", "....              ")
 
+
+    
 use_first_prompt = False
 loaded_context = ""
+client_thread.start()
+give_time_memory = True
 #? ===== Prompt the first-prompt in config file ===== ?#
 if "load-context" in user_configurations and user_configurations["load-context"] != "":
     loaded_context = user_configurations["load-context"]
 
 elif "first-prompt" in user_configurations and user_configurations["first-prompt"] != "":
     use_first_prompt = True
-    first_prompt = user_configurations["first-prompt"]
-    print(first_prompt)
+
+    first_prompt = (f"(It's been {f'{days} days, ' if days > 0 else ''}{f'{hours} hours, ' if hours > 0 else ''}{f'{minutes} minutes, and ' if minutes > 0 else ''}{seconds} seconds since last time you talk to him)" if last_time != 0 else "")+user_configurations["first-prompt"]
+    use_first_prompt = False
+    print(f"{USER_TEXT_COLOR}[FIRST PROMPT USER]{WHITE_COLOR} {first_prompt}")
     result = send_req_to_ai(first_prompt, choosen_model)
+    print(f"{ARCH_TEXT_COLOR}[ARCH] {WHITE_COLOR}", end="", flush=True)
     generate_response(result)
 
 
@@ -335,7 +403,6 @@ elif "first-prompt" in user_configurations and user_configurations["first-prompt
 
 
 #? ====== Running the AI! ====== ?#
-client_thread.start()
 print("Waiting for command..")
 while running:
     message = ""
@@ -357,11 +424,16 @@ while running:
 
     #? If there's a new message
     if message != "":
+        if give_time_memory:
+            message = (f"(It's been {f'{days} days,' if days > 0 else ''}{f'{hours} hours,' if hours > 0 else ''}{f'{minutes} minutes,' if minutes > 0 else ''}{seconds} seconds since the last time you met him)" if last_time != 0 else "")+message
+            give_time_memory = False
         print(f"{USER_TEXT_COLOR}[USER] {WHITE_COLOR}{message}")
         result = send_req_to_ai(message, choosen_model)
         print(f"{ARCH_TEXT_COLOR}[ARCH] {WHITE_COLOR}", end="")
         generate_response(result)
         print()
+        if activate_memory:
+            update_memory()
         afk_count = 0
 
     if wait_time < 1 and wait_time > -1:
