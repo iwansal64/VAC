@@ -52,8 +52,14 @@ allow_command_prompt = True
 #? Confirmation command prompt
 confirmation_command_prompt = True
 
+#? Maximum number of words the AI can output
+max_output_words = 0
+
 #? Activate memory
 activate_memory = True
+
+#? Allowing the AI to send message while AFK
+allow_wait = True
 
 def print_error(title: str, message: str) -> None:
     '''
@@ -172,7 +178,7 @@ def generate_response(response_iterator: Iterator[Mapping[str, str]], update_con
 
                 if next_value == "N/A":
                     wait_time = -1
-                else:
+                elif allow_wait:
                     try:
                         wait_time = min(10, int(next_value)) * 2 #? Constrain the wait time to the minimal value of 10 seconds * 2 which is 20 seconds
                         debug(f"wait_time ({next_value}) is a number")
@@ -321,6 +327,12 @@ if check_configuration("activate-memory"):
 if check_configuration("memory-file-path"):
     memory_file_path = user_configurations.get("memory-file-path")
 
+if check_configuration("max-output-words"):
+    max_output_words = user_configurations.get("max-output-words")
+
+if check_configuration("allow-wait"):
+    allow_wait = user_configurations.get("allow-wait")
+
 
 # ---------------------------------------------------------------------------------------------------------------- #
 
@@ -369,7 +381,7 @@ message_folder_path = message_folder_path.replace("~", HOME)
 print("Starting ollama on your computer...", end="\r")
 time.sleep(0.5) if not fast_startup else print(end="")
 #? If there's an error when starting ollama..
-if output != 0:
+if code != 0:
     #? If the error is actually is already running so that we don't have to run it again
     if output == "Error: listen tcp 127.0.0.1:11434: bind: address already in use":
         print("oh.. it's already running.. aight", end="\r")
@@ -386,6 +398,7 @@ print_success("STARTING OLLAMA SUCCESS", "....              ")
 use_first_prompt = False
 loaded_context = ""
 client_thread.start()
+cmd("reset")
 give_time_memory = True
 #? ===== Prompt the first-prompt in config file ===== ?#
 if "load-context" in user_configurations and user_configurations["load-context"] != "":
@@ -427,19 +440,21 @@ while running:
 
     #? If there's a new message
     if message != "":
-        if give_time_memory:
-            message = (f"(It's been {f'{days} days,' if days > 0 else ''}{f'{hours} hours,' if hours > 0 else ''}{f'{minutes} minutes,' if minutes > 0 else ''}{seconds} seconds since the last time you met him)" if last_time != 0 else "")+message
-            give_time_memory = False
         print(f"{USER_TEXT_COLOR}[USER] {WHITE_COLOR}{message}")
-        result = send_req_to_ai(message, choosen_model)
+        result = send_req_to_ai(f"{f'(From now on you are limited to {max_output_words} words each response)' if max_output_words else ''}(It's been {f'{days} days,' if days > 0 else ''}{f'{hours} hours,' if hours > 0 else ''}{f'{minutes} minutes,' if minutes > 0 else ''}{seconds} seconds since the last time you met him)"+message if give_time_memory else message, choosen_model)
         print(f"{ARCH_TEXT_COLOR}[ARCH] {WHITE_COLOR}", end="")
         generate_response(result)
         print()
+
         if activate_memory:
             update_memory()
+            
+        if give_time_memory:
+            give_time_memory = False
         afk_count = 0
 
-    if wait_time < 1 and wait_time > -1:
+    #? If the wait_time is timeout
+    if allow_wait and (wait_time < 1 and wait_time > -1):
         print(f"{AFK_TEXT_COLOR}[WAIT TIMEOUT] {WHITE_COLOR}", end="\n", flush=True)
         result = send_req_to_ai(f"[system:system_command] you've waited for the user but the user is not answered you or maybe he's currently afk or maybe he's currently typing..", choosen_model)
         print(f"{ARCH_TEXT_COLOR}[ARCH] {WHITE_COLOR}", end="", flush=True)
