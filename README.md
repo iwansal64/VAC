@@ -8,12 +8,12 @@ I also don't know if this works with other Linux distribution.. So.. yeah.
 ## HOW TO SETUP
 ### 1. Install it on your computer with git clone
 ```
-$ git clone https://github.com/iwansal64/VAC.git
-$ cd ./VAC
+git clone https://github.com/iwansal64/VAC.git
+cd ./VAC
 ```
 ### 2. Run the setup
 ```
-$ sh ./setup.sh
+sh ./setup.sh
 ```
 You can choose wheter set up environment or not (recomended) and then wait for it to finish. and you're done!!
 You can start using it by typing `vac.sh`
