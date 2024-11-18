@@ -1,5 +1,5 @@
 # !pip install playsound
-import os, subprocess, sys, json, time, ollama, threading, datetime, io, playsound
+import os, subprocess, sys, json, time, ollama, threading, datetime, io, playsound3 as playsound
 from typing import Tuple, Mapping, Iterator
 
 CURRENT_DIR = "/".join(__file__.split("/")[:-1])

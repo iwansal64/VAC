@@ -1,16 +1,82 @@
 #!
+# Remover
+printf "\e[1;34m"
+if [ "$1" == "--remove" -o "$1" == "--remove-all" ]; then
+	agree="Y"
+    if [ "$1" != "--remove-all" ]; then
+	    printf "Remove configuration file?"
+        read agree
+    fi
+
+	if [ "$agree" == "Y" -o "$agree" == "y" ]; then
+		printf "\e[1;33mRemoving configuration file..\e[1;34m\n"
+		rm -rf ~/.config/vac
+	fi
+	
+	agree="Y"	
+    
+    if [ "$1" != "--remove-all" ]; then
+	    printf "Remove all logging files?"
+        read agree
+    fi
+
+	if [ "$agree" == "Y" -o "$agree" == "y" ]; then
+		printf "\e[1;33mRemoving logging file..\e[1;34m\n"
+		rm -rf ~/.var/vac
+	fi
+
+    agree="Y"
+    if [ "$1" != "--remove-all" ]; then
+        printf "Remove all memory files?"
+        read agree
+    fi
+
+    if [ "$agree" == "Y" -o "$agree" == "y" ]; then
+        printf "\e[1;33mRemoving memory file..\e[1;34m\n"
+        rm -rf ~/Documents/VAC
+    fi
+	
+	agree="Y"
+	printf "Remove ollama?"
+	read agree
+	
+	if [ "$agree" == "Y" -o "$agree" == "y" ]; then
+		printf "\e[1;33mRemoving ollama...\e[1;34m\n"
+		sudo rm -rf /usr/local/bin/ollama 2>&1 >/dev/null
+	fi
+
+	printf "\e[1;32mVAC removal has been exited successfully..\e[0;37m\n"		
+	exit 0
+fi
+
+
+if [ "$1" == "--help" ]; then
+    printf "+----------------------------------------------------------------+\n"
+    printf "|         Virtual Arch Companion [VAC] \e[1;32mInstallation Setup \e[1;34m       |\n"
+    printf "+-----+----------------------------------------------------------+\n"
+    printf "|\e[1;32mUsage\e[1;34m|                                                          |\n"
+    printf "+-----+                                                          |\n"
+    printf "|(*) \e[1;32msetup.sh              \e[1;33m<- Normal Installation                \e[1;34m|\n"
+    printf "|(*) \e[1;32msetup.sh --auto       \e[1;33m<- Automatic Installation (auto 'yes')\e[1;34m|\n"
+    printf "|(*) \e[1;32msetup.sh --remove     \e[1;33m<- Normal Remove VAC                  \e[1;34m|\n"
+    printf "|(*) \e[1;32msetup.sh --remove-all \e[1;33m<- Automatic Remove VAC (auto 'yes')  \e[1;34m|\n"
+    printf "+----------------------------------------------------------------+\n"
+    exit 0
+fi
+
+
 # Setup configuration file
 continue_write="Y"
 
 if [ -d ~/.config/vac ]; then
     continue_write="n"
-    printf "~/.config/vac directory is already found. \e[0;31mRewrite the folder?\e[0;37m"
+    printf "~/.config/vac directory is already found. \e[1;31mRewrite the folder?\e[1;34m"
     read continue_write
 fi
 
 if [ "$continue_write" == "Y" -o "$continue_write" == "y" ]; then
-    printf "Writing to ~/.config/vac/..."
-    mkdir ~/.config/vac/
+    printf "Writing to ~/.config/vac/...\n"
+    mkdir -p ~/.config/vac/
     touch ~/.config/vac/config.json
     printf '{\n	"model": "arch-anime-assistant",\n	"allow-command-prompt": true,\n	"confirmation-command-prompt": true,\n	"first-prompt": "",	\n	"activate-memory": true,\n	"max-output-words": 0,\n	"save-message-history":false,\n	"debug-file-path": "~/.var/vac/debug.log",\n	"message-folder-path": "~/.var/vac/messages",\n	"sounds-folder-path": "$FILE_PATH/Sounds",\n	"memory-file-path": "~/Documents/VAC/memory.json"\n}' > ~/.config/vac/config.json
 fi
@@ -19,17 +85,32 @@ fi
 continue_write="Y"
 if [ -d ~/.var/vac ]; then
     continue_write="n"
-    printf "~/.var/vac directory is already found. \e[0;31mRewrite the folder?\e[0;37m"
+    printf "~/.var/vac directory is already found. \e[1;31mRewrite the folder?\e[1;34m"
+    read continue_write
+fi
+
+if [ "$continue_write" == "Y" -o "$continue_write" == "y" ]; then
+    printf "Writing to ~/.var/vac/...\n"
+    mkdir -p ~/.var/vac
+    mkdir ~/.var/vac/messages
+    touch ~/.var/vac/debug.log
+fi
+
+# Setup memory file
+printf "Set up memory directories...\n"
+continue_write="Y"
+if [ -d ~/Documents/VAC ]; then
+    continue_write="n"
+    printf "~/Documents/VAC directory is already found. \e[1;31mRewrite the folder?\e[1;34m"
     read continue_write
 fi
 
 if [ "$continue_write" == "Y" -o "$continue_write" == "y" ]; then
     printf "Writing to ~/.var/vac/..."
-    mkdir ~/.var/vac
-    mkdir ~/.var/vac/messages
-    touch ~/.var/vac/debug.log
+    mkdir -p ~/Documents/VAC
+    touch ~/Documents/VAC/memory.json
 fi
-    
+
 
 # Setup ollama
 if ! ollama -v  2>&1 >/dev/null
@@ -74,9 +155,12 @@ if [ "$setup_environment" == 'Y' -o "$setup_environment" == 'y' ]; then
             printf "\n\nexport PATH=${PWD}/:\$PATH" >> "$shell_configuration_file"
         fi
     fi
+	
+	printf "\e[1;32mEnv Variable has been setup successfully.\n"
 fi
 
 # DONE!
-printf "\033[0;32msetup successfully exited!\033[0;37m\n"
+printf "\e[1;32msetup successfully exited!\e[1;37m\n"
 printf "you can change configuration at:~/.config/vac/config.json\n"
-
+printf "Have Fun With Arch~\n"
+exit 0
