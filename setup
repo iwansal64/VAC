@@ -1,4 +1,5 @@
-#!
+#!/bin/bash
+
 # Remover
 printf "\e[1;34m"
 if [ "$1" == "--remove" -o "$1" == "--remove-all" ]; then
@@ -66,8 +67,22 @@ fi
 
 
 # Setup configuration file
-continue_write="Y"
 
+continue_write="n"
+
+printf "Confirm Installation (y/n) : "
+read continue_write
+
+if [ "$continue_write" != "y" ]; then
+	printf "Okay then!\n"
+	exit
+fi
+
+printf "|------------ \e[1;33m(1/3)\e[1;34m SETTING UP FOLDERS AND FILES -------------|\n\n"
+
+# Setup configuration file
+printf "\e[1;33m1/3)\e[1;34m Set up configuration file\n"
+continue_write="Y"
 if [ -d ~/.config/vac ]; then
     continue_write="n"
     printf "~/.config/vac directory is already found. \e[1;31mRewrite the folder?\e[1;34m"
@@ -79,9 +94,12 @@ if [ "$continue_write" == "Y" -o "$continue_write" == "y" ]; then
     mkdir -p ~/.config/vac/
     touch ~/.config/vac/config.json
     printf '{\n	"model": "arch-anime-assistant",\n	"allow-command-prompt": true,\n	"confirmation-command-prompt": true,\n	"first-prompt": "",	\n	"activate-memory": true,\n	"max-output-words": 0,\n	"save-message-history":false,\n	"debug-file-path": "~/.var/vac/debug.log",\n	"message-folder-path": "~/.var/vac/messages",\n	"sounds-folder-path": "$FILE_PATH/Sounds",\n	"memory-file-path": "~/Documents/VAC/memory.json"\n}' > ~/.config/vac/config.json
+else
+	printf "Skipping...\n"
 fi
 
 # Setup logging and chat file
+printf "\e[1;33m2/3)\e[1;34m Set up chat logging folder...\n"
 continue_write="Y"
 if [ -d ~/.var/vac ]; then
     continue_write="n"
@@ -94,10 +112,12 @@ if [ "$continue_write" == "Y" -o "$continue_write" == "y" ]; then
     mkdir -p ~/.var/vac
     mkdir ~/.var/vac/messages
     touch ~/.var/vac/debug.log
+else
+	printf "Skipping...\n"
 fi
 
 # Setup memory file
-printf "Set up memory directories...\n"
+printf "\e[1;33m3/3)\e[1;34m Set up memory directories...\n"
 continue_write="Y"
 if [ -d ~/Documents/VAC ]; then
     continue_write="n"
@@ -109,10 +129,14 @@ if [ "$continue_write" == "Y" -o "$continue_write" == "y" ]; then
     printf "Writing to ~/.var/vac/..."
     mkdir -p ~/Documents/VAC
     touch ~/Documents/VAC/memory.json
+else
+	printf "Skipping...\n"
 fi
 
 
 # Setup ollama
+printf "|------------ \e[1;33m(2/3)\e[1;34m SETUP OLLAMA FOR AI AGENT ------------|\n\n"
+
 if ! ollama -v  2>&1 >/dev/null
 then
     printf "ollama could not be found.. want to install it with 'curl -fsSL https://ollama.com/install.sh | sh'?"
@@ -126,10 +150,13 @@ then
         exit 0
     fi
 fi
+
 ollama pull llama3.1:8b
 ollama create arch-anime-assistant -f arch-anime-assistant
 
 # Setup .bashrc
+printf "|--------------- \e[1;33m(3/3)\e[1;34m SETUP ENVIRONMENT ----------------|\n\n"
+
 setup_environment=""
 printf "Want to setup for the variable environment? (Y/n) "
 read setup_environment
@@ -160,6 +187,7 @@ if [ "$setup_environment" == 'Y' -o "$setup_environment" == 'y' ]; then
 fi
 
 # DONE!
+printf "------------------- DONE!! ------------------"
 printf "\e[1;32msetup successfully exited!\e[1;37m\n"
 printf "you can change configuration at:~/.config/vac/config.json\n"
 printf "Have Fun With Arch~\n"
