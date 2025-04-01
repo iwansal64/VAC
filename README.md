@@ -11,10 +11,17 @@ I also don't know if this works with other Linux distribution.. So.. yeah.
 git clone https://github.com/iwansal64/VAC.git
 cd ./VAC
 ```
-### 2. Run the setup
+
+### 2. Change setup permission
 ```
-sh ./setup.sh
+chmod +x ./setup
 ```
+
+### 3. Run the setup
+```
+./setup
+```
+
 You can choose wheter set up environment or not (recomended) and then wait for it to finish. and you're done!!
 You can start using it by typing `vac.sh`
 
