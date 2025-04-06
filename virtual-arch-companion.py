@@ -72,6 +72,12 @@ def print_success(title: str, message: str="") -> None:
     Print a successful message
     '''
     print(f"{GREEN_COLOR}[{title}] {WHITE_COLOR}{message}")
+
+def print_config(title: str, message: str="") -> None:
+    '''
+    Print a successful message
+    '''
+    print(f"{YELLOW_BOLD_COLOR}[{title}] {WHITE_COLOR}{message}")
     
 def cmd(command: str) -> Tuple[bytes, int]:
     '''
@@ -390,8 +396,16 @@ if code != 0:
     else:
         print_error("STARTING OLLAMA ERROR", output)
         exit(0)
-
+        
 print_success("STARTING OLLAMA SUCCESS", "....              ")
+
+print_config("MAX OUTPUT WORDS", f"{GREEN_COLOR} INFINITY" if max_output_words == 0 else f"{max_output_words}")
+print_config("ALLOW COMMAND PROMPT", f"{GREEN_COLOR} YES" if allow_command_prompt else f"{RED_COLOR} NO")
+if allow_command_prompt:
+    print_config("CONFIRMATION COMMAND PROMPT", f"{GREEN_COLOR} YES" if confirmation_command_prompt else f"{RED_COLOR} NO")
+print_config("ALLOW WAIT", f"{GREEN_COLOR} YES" if allow_wait else f"{RED_COLOR} NO")
+print_config("SAVE MESSAGES HISTORY", f"{GREEN_COLOR} YES" if save_messages_history else f"{RED_COLOR} NO")
+print_config("MEMORY", f"{GREEN_COLOR} ACTIVATED" if activate_memory else f"{RED_COLOR} NOT ACTIVATED")
 
 
     

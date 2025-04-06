@@ -1,1 +1,1 @@
-source /home/$USER/Codes/Python/VAC/.venv/bin/activate &&  cd /home/$USER/Codes/Python/VAC && .venv/bin/python /home/$USER/Codes/Python/VAC/virtual-arch-companion.py $1 $2 $3 $4 $5 $6
+source /home/Iwan/Softwares/MINE/VAC/venv/bin/activate && cd /home/Iwan/Softwares/MINE/VAC && venv/bin/python /home/Iwan/Softwares/MINE/VAC/virtual-arch-companion.py      
